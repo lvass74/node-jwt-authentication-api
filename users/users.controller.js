@@ -4,62 +4,50 @@ const userService = require('./user.service');
 
 // routes
 router.post('/authenticate', authenticate);
-router.all('/refresh_authentication', refreshToken);
 router.get('/', getAll);
 
 module.exports = router;
 
-function authenticate(req, res, next) {
-    userService.authenticate(req.body)
-        .then(({refresh_token, ...user}) => {
-            console.log(refresh_token, user)
-            return res
-            .cookie(
-                'refresh_token', 
-                refresh_token, 
-                {
-                    httpOnly: true,
-                    maxAge: 7 * 24 * 60 * 60 * 1000,
-                    path: '/users/refresh_authentication',
-                    sameSite: true
-                })
-            .json(user)
-        })
-        .catch(next);
+async function authenticate(req, res, next) {
+    let refresh_token, user
+
+    const { username, password } = req.body
+    const received_refresh_token = req.cookies['refresh_token']
+
+    if (username || password) {
+        try {
+            ({ refresh_token, ...user } = await userService.authenticateByCredentials(username, password))
+        }
+        catch {
+            return res.status(401).json({ error: "Invalid credentials" })
+        }
+    } 
+    else if(received_refresh_token) {
+        try {
+            ({ refresh_token, ...user } = await userService.authenticateByRefreshToken(received_refresh_token))
+        }
+        catch {
+            return res.status(401).json({ error: "Invalid refresh token" })
+        }
+    }
+    else {
+            return res.status(400).json({ error: "Neither credentials nor refresh token were found" })
+    }
+    return res
+        .cookie(
+            'refresh_token', 
+            refresh_token, 
+            {
+                httpOnly: true,
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+                path: '/users/authenticate',
+                sameSite: true
+            })
+        .json(user)
 }
 
 function getAll(req, res, next) {
     userService.getAll()
         .then(users => res.json(users))
         .catch(next);
-}
-
-async function refreshToken(req, res, next) {
-    const refresh_token = req.cookies['refresh_token']
-    if (refresh_token) {
-        try {
-            const { refresh_token: new_refresh_token, ...user } = await userService.refreshAuthentication(refresh_token)
-            res
-            .cookie(
-                'refresh_token',
-                new_refresh_token, 
-                {
-                    httpOnly: true,
-                    maxAge: 7 * 24 * 60 * 60 * 1000,
-                    path: '/users/refresh_authentication',
-                    sameSite: true
-    //                    signed: true
-                }
-            )
-            .json(user)
-        }
-        catch {
-            res.status(401).json({ error: "Invalid refresh token" })
-        }
-    } 
-    else {
-        console.log(`Cookies found: ${Object.entries(req.cookies).map(([key, value]) => `${key}: ${value}`)}`)
-        res.status(401).send()
-    }
-    
 }

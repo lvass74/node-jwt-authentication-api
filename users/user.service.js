@@ -9,12 +9,12 @@ const users = [
 ];
 
 module.exports = {
-    authenticate,
-    refreshAuthentication,
+    authenticateByCredentials,
+    authenticateByRefreshToken,
     getAll
 };
 
-async function authenticate({ username, password }) {
+async function authenticateByCredentials(username, password) {
     const user = users.find(u => u.username === username && u.password === password);
 
     if (!user) throw 'Username or password is incorrect';
@@ -30,7 +30,7 @@ async function authenticate({ username, password }) {
     };
 }
 
-async function refreshAuthentication(input_refresh_token) {
+async function authenticateByRefreshToken(input_refresh_token) {
     const parsed_token = jwtVerifyToken(input_refresh_token)
     if ( ! parsed_token ) {
         throw 'Failed to validate token';
